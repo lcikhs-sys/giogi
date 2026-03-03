@@ -668,6 +668,7 @@ function init() {
     showScreen('setup');
     return;
   }
+  showScreen('main'); // 키 있으면 메인 화면으로
   updateMainDate();
   updateTodayBadge();
   rescheduleAllAlarms();
@@ -1004,9 +1005,14 @@ function autoResize(el) {
 
 async function startConversation() {
   showTyping(true);
-  const greeting = await callGemini('안녕하세요, 새 기억을 입력하려고 합니다.');
-  showTyping(false);
-  addMessage(greeting, 'ai');
+  try {
+    const greeting = await callGemini('시작');
+    showTyping(false);
+    addMessage(greeting, 'ai');
+  } catch(e) {
+    showTyping(false);
+    addMessage('다시 시도해 주세요.', 'ai');
+  }
 }
 
 async function sendMessage() {
@@ -1035,7 +1041,15 @@ async function sendMessage() {
   }
 
   showTyping(true);
-  const aiReply = await callGemini(text);
+  let aiReply;
+  try {
+    aiReply = await callGemini(text);
+  } catch(e) {
+    showTyping(false);
+    addMessage('다시 시도해 주세요.', 'ai');
+    document.getElementById('sendBtn').disabled = false;
+    return;
+  }
   showTyping(false);
 
   // SAVE_MEMORY 파싱
