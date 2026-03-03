@@ -502,8 +502,20 @@
 </head>
 <body>
 
+<!-- ════ 설정 화면 (최초 1회) ════ -->
+<div id="screen-setup" class="screen active" style="background:linear-gradient(160deg,#7B4FEB,#3A1A9E);align-items:center;justify-content:center;padding:32px 24px;">
+  <div style="color:#fff;font-size:38px;font-weight:800;margin-bottom:8px;text-align:center">🧠 기억 도우미</div>
+  <div style="color:rgba(255,255,255,0.8);font-size:17px;margin-bottom:32px;text-align:center">처음 한 번만 입력하세요</div>
+  <div style="background:rgba(255,255,255,0.15);border-radius:20px;padding:24px;width:100%;">
+    <div style="color:#fff;font-size:18px;font-weight:700;margin-bottom:12px">🔑 Gemini API 키</div>
+    <input id="setupKeyInput" type="password" style="width:100%;border:none;border-radius:14px;padding:16px;font-size:17px;outline:none;margin-bottom:12px" placeholder="AIzaSy... 로 시작하는 키 입력"/>
+    <button onclick="saveSetupKey()" style="width:100%;background:#F9A825;border:none;border-radius:14px;padding:18px;font-size:22px;font-weight:800;color:#fff;cursor:pointer">저장하고 시작</button>
+  </div>
+  <div style="color:rgba(255,255,255,0.6);font-size:13px;margin-top:20px;text-align:center;line-height:1.6">aistudio.google.com 에서 무료 발급<br>한 번 입력하면 다시 묻지 않아요</div>
+</div>
+
 <!-- ════ 메인 화면 ════ -->
-<div id="screen-main" class="screen active">
+<div id="screen-main" class="screen">
   <div class="main-header">
     <div class="main-title">🧠 기억 도우미</div>
     <div class="main-subtitle">말씀해 주시면 제가 기억해 드릴게요</div>
@@ -632,7 +644,7 @@
 ══════════════════════════════════ */
 const STORAGE_KEY = 'giogi_v3';
 const API_KEY_STORAGE = 'giogi_api_key';
-const BUILT_IN_API_KEY = 'AIzaSyDXnMZap2B7nB74A7TE6FNB9INm15cY6r8';
+const BUILT_IN_API_KEY = '';
 let memories = [];
 let chatHistory = [];
 let pendingSaveData = null;
@@ -652,16 +664,32 @@ let isListening = false;
 ══════════════════════════════════ */
 function init() {
   memories = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  localStorage.setItem(API_KEY_STORAGE, BUILT_IN_API_KEY);
+  if (!localStorage.getItem(API_KEY_STORAGE)) {
+    showScreen('setup');
+    return;
+  }
   updateMainDate();
   updateTodayBadge();
   rescheduleAllAlarms();
   initSpeechRecognition();
-
 }
 
-function checkApiKey() { /* API 키 내장됨 */ }
-function saveApiKey() { /* API 키 내장됨 */ }
+function saveSetupKey() {
+  const val = document.getElementById('setupKeyInput').value.trim();
+  if (!val || !val.startsWith('AIza')) {
+    alert('AIzaSy... 로 시작하는 키를 입력해 주세요.');
+    return;
+  }
+  localStorage.setItem(API_KEY_STORAGE, val);
+  updateMainDate();
+  updateTodayBadge();
+  rescheduleAllAlarms();
+  initSpeechRecognition();
+  showScreen('main');
+}
+
+function checkApiKey() { /* localStorage 저장 방식 */ }
+function saveApiKey()  { /* localStorage 저장 방식 */ }
 
 /* ══════════════════════════════════
    직접 마이크 (Web Speech API)
@@ -1402,7 +1430,7 @@ document.getElementById('sendBtn').onclick = sendMessagePatched;
 /* ══════════════════════════════════
    뒤로가기 / 앱 종료 확인
 ══════════════════════════════════ */
-const screenOrder = { 'main': null, 'chat': 'main', 'list': 'main', 'edit': 'list', 'alarm': 'main' };
+const screenOrder = { 'setup': null, 'main': null, 'chat': 'main', 'list': 'main', 'edit': 'list', 'alarm': 'main' };
 
 function currentScreen() {
   const el = document.querySelector('.screen.active');
