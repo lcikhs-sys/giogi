@@ -1,0 +1,1405 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="기억 도우미"/>
+<title>기억 도우미</title>
+<style>
+  :root {
+    --p: #6C3CE1;
+    --pl: #EDE7FF;
+    --pd: #4A1FA8;
+    --g: #2E9E6B;
+    --gl: #E0F5EC;
+    --bg: #F4F1FB;
+    --white: #FFFFFF;
+    --dark: #1A1235;
+    --mid: #6B6680;
+    --red: #E53935;
+    --gold: #F9A825;
+    --chat-ai: #EDE7FF;
+    --chat-user: #DCF8C6;
+    --shadow: 0 4px 20px rgba(108,60,225,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--dark);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ─── 공통 ─── */
+  .screen { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+  .screen.active { display: flex; }
+
+  .top-bar {
+    background: var(--white);
+    padding: 16px 20px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid #E8E4F5;
+    flex-shrink: 0;
+  }
+  .top-bar h2 { font-size: 22px; font-weight: 700; color: var(--dark); }
+  .back-btn {
+    background: var(--pl);
+    border: none;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 18px;
+    cursor: pointer;
+    color: var(--p);
+    font-weight: 700;
+  }
+
+  /* ─── 메인 화면 ─── */
+  #screen-main {
+    background: linear-gradient(160deg, #7B4FEB 0%, #5B2FD0 50%, #3A1A9E 100%);
+    align-items: center;
+    justify-content: flex-start;
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .main-header {
+    width: 100%;
+    padding: 32px 24px 16px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .main-title { font-size: 38px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+  .main-subtitle { font-size: 16px; color: rgba(255,255,255,0.8); margin-top: 4px; }
+
+  .main-date-box {
+    background: rgba(255,255,255,0.18);
+    border-radius: 16px;
+    padding: 10px 24px;
+    margin: 0 24px;
+    text-align: center;
+    color: #fff;
+    font-size: 16px;
+    flex-shrink: 0;
+    width: calc(100% - 48px);
+  }
+
+  .main-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 24px;
+    width: 100%;
+    flex-shrink: 0;
+  }
+
+  .main-btn {
+    border: none;
+    border-radius: 28px;
+    padding: 26px 24px;
+    font-size: 32px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+  }
+  .main-btn:active { transform: scale(0.97); }
+  .main-btn-new { background: linear-gradient(135deg, #F9A825, #F57F17); color: #fff; }
+  .main-btn-check { background: linear-gradient(135deg, #2E9E6B, #1B5E3F); color: #fff; }
+  .main-btn .btn-icon { font-size: 40px; }
+  .main-btn .btn-label { display: flex; flex-direction: column; align-items: flex-start; }
+  .main-btn .btn-main-text { font-size: 32px; font-weight: 800; line-height: 1; }
+  .main-btn .btn-sub-text { font-size: 16px; font-weight: 400; opacity: 0.85; margin-top: 4px; }
+
+  .today-badge {
+    background: rgba(255,255,255,0.2);
+    border-radius: 20px;
+    margin: 0 24px 14px;
+    padding: 12px 18px;
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: calc(100% - 48px);
+  }
+  .today-badge .badge-title { font-size: 13px; opacity: 0.8; margin-bottom: 3px; }
+  .today-badge .badge-count { font-size: 19px; font-weight: 700; }
+
+  /* ─── API 키 설정 ─── */
+  /* api-setup 제거됨 */
+
+  /* ─── 대화 화면 ─── */
+  #screen-chat {
+    background: #F0EDF8;
+  }
+
+  .chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .msg {
+    max-width: 82%;
+    border-radius: 20px;
+    padding: 14px 18px;
+    font-size: 19px;
+    line-height: 1.5;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  .msg-ai {
+    background: var(--white);
+    color: var(--dark);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .msg-user {
+    background: var(--chat-user);
+    color: var(--dark);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .msg-system {
+    background: #FFF8E1;
+    color: #795548;
+    align-self: center;
+    font-size: 15px;
+    border-radius: 12px;
+    max-width: 90%;
+    text-align: center;
+    padding: 10px 16px;
+  }
+  .msg-ai .ai-label {
+    font-size: 12px;
+    color: var(--p);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .typing-indicator {
+    display: none;
+    align-self: flex-start;
+    background: var(--white);
+    border-radius: 20px;
+    border-bottom-left-radius: 4px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .typing-dots span {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--p);
+    border-radius: 50%;
+    margin: 0 2px;
+    animation: bounce 1.2s infinite;
+  }
+  .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-8px); } }
+
+  /* 저장 확인 카드 */
+  .save-card {
+    background: linear-gradient(135deg, var(--p), var(--pd));
+    color: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    margin: 4px 0;
+    align-self: flex-start;
+    max-width: 90%;
+    box-shadow: var(--shadow);
+  }
+  .save-card .sc-title { font-size: 13px; opacity: 0.8; margin-bottom: 10px; }
+  .save-card .sc-summary { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .save-card .sc-detail { font-size: 16px; opacity: 0.9; margin-bottom: 14px; line-height: 1.6; }
+  .save-card-btns { display: flex; gap: 10px; }
+  .save-card-btns button {
+    flex: 1; border: none; border-radius: 12px;
+    padding: 12px 0; font-size: 17px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.1s;
+  }
+  .save-card-btns button:active { opacity: 0.8; }
+  .btn-confirm-save { background: var(--gold); color: #fff; }
+  .btn-cancel-save { background: rgba(255,255,255,0.25); color: #fff; }
+
+  /* ─── 입력창 ─── */
+  .chat-input-area {
+    background: var(--white);
+    border-top: 1px solid #E8E4F5;
+    padding: 12px 14px 20px;
+    flex-shrink: 0;
+  }
+
+  .mic-hint {
+    background: #FFF8E1;
+    border-radius: 12px;
+    padding: 8px 14px;
+    font-size: 14px;
+    color: #6D4C00;
+    margin-bottom: 10px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  .chat-textarea {
+    flex: 1;
+    border: 2px solid #DDD8F5;
+    border-radius: 18px;
+    padding: 12px 16px;
+    font-size: 18px;
+    font-family: inherit;
+    resize: none;
+    outline: none;
+    min-height: 52px;
+    max-height: 120px;
+    line-height: 1.4;
+    color: var(--dark);
+    background: #FAFAFE;
+    transition: border-color 0.2s;
+  }
+  .chat-textarea:focus { border-color: var(--p); }
+
+  /* ─── 직접 마이크 버튼 ─── */
+  .mic-direct-btn {
+    width: 100%;
+    border: none;
+    border-radius: 22px;
+    padding: 22px 16px;
+    font-size: 26px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: #fff;
+    background: linear-gradient(135deg, #E53935, #C62828);
+    box-shadow: 0 4px 16px rgba(229,57,53,0.4);
+    transition: transform 0.1s, box-shadow 0.1s;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .mic-direct-btn.listening {
+    background: linear-gradient(135deg, #C62828, #7B1414);
+    box-shadow: 0 0 0 0 rgba(229,57,53,0.6);
+    animation: micPulse 1.2s ease-out infinite;
+  }
+  @keyframes micPulse {
+    0%   { box-shadow: 0 0 0 0   rgba(229,57,53,0.6); }
+    70%  { box-shadow: 0 0 0 18px rgba(229,57,53,0); }
+    100% { box-shadow: 0 0 0 0   rgba(229,57,53,0); }
+  }
+  .mic-direct-btn:active { transform: scale(0.97); }
+  .mic-direct-btn:disabled { background: #AAA; box-shadow: none; animation: none; }
+  .mic-icon { font-size: 34px; }
+  .mic-label { display: flex; flex-direction: column; align-items: flex-start; line-height: 1.2; }
+  .mic-main  { font-size: 26px; font-weight: 800; }
+  .mic-sub   { font-size: 14px; font-weight: 400; opacity: 0.85; margin-top: 2px; }
+
+  .send-btn {
+    background: var(--p);
+    border: none;
+    border-radius: 14px;
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+    cursor: pointer;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.1s;
+  }
+  .send-btn:active { background: var(--pd); }
+  .send-btn:disabled { background: #CCC; cursor: not-allowed; }
+
+  .voice-tip {
+    font-size: 13px;
+    color: var(--mid);
+    text-align: center;
+    margin-top: 8px;
+  }
+  .voice-tip strong { color: var(--p); }
+  .no-speech-note {
+    font-size: 13px; color: #B71C1C; text-align: center;
+    margin-top: 6px; display: none;
+  }
+
+  /* ─── 확인 화면 (목록) ─── */
+  #screen-list { background: var(--bg); }
+
+  .list-tabs {
+    display: flex;
+    background: var(--white);
+    border-bottom: 2px solid #E8E4F5;
+    flex-shrink: 0;
+  }
+  .tab-btn {
+    flex: 1; border: none; background: transparent;
+    padding: 14px 8px; font-size: 16px; font-weight: 600;
+    color: var(--mid); cursor: pointer; position: relative;
+    transition: color 0.2s;
+  }
+  .tab-btn.active { color: var(--p); }
+  .tab-btn.active::after {
+    content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px; background: var(--p); border-radius: 3px 3px 0 0;
+  }
+
+  .read-all-btn {
+    background: var(--p);
+    border: none;
+    border-radius: 16px;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 20px;
+    margin: 12px 16px 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .memory-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 24px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .empty-msg {
+    text-align: center;
+    color: var(--mid);
+    font-size: 18px;
+    padding: 60px 20px;
+    line-height: 1.6;
+  }
+  .empty-msg .empty-icon { font-size: 56px; display: block; margin-bottom: 14px; }
+
+  .memory-card {
+    background: var(--white);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    border-left: 5px solid var(--p);
+    animation: fadeIn 0.2s ease;
+  }
+  .memory-card.today { border-left-color: var(--g); }
+  .memory-card.past { border-left-color: #CCC; opacity: 0.7; }
+  .memory-card.memo { border-left-color: var(--gold); }
+
+  .mc-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .mc-summary { font-size: 20px; font-weight: 700; color: var(--dark); flex: 1; line-height: 1.3; }
+  .mc-badge {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    font-weight: 700; white-space: nowrap; flex-shrink: 0;
+  }
+  .badge-today { background: var(--gl); color: var(--g); }
+  .badge-upcoming { background: var(--pl); color: var(--p); }
+  .badge-past { background: #F5F5F5; color: #999; }
+  .badge-memo { background: #FFF8E1; color: #F57F17; }
+
+  .mc-datetime { font-size: 16px; color: var(--mid); margin-bottom: 6px; }
+  .mc-alarm { font-size: 15px; color: var(--p); margin-bottom: 10px; }
+  .mc-original { font-size: 14px; color: #AAA; margin-bottom: 10px; font-style: italic; }
+
+  .mc-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .mc-actions button {
+    border: none; border-radius: 12px;
+    padding: 8px 16px; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: opacity 0.1s;
+  }
+  .mc-actions button:active { opacity: 0.7; }
+  .btn-edit { background: var(--pl); color: var(--p); }
+  .btn-delete { background: #FFF0F0; color: var(--red); }
+  .btn-speak { background: var(--gl); color: var(--g); }
+
+  /* ─── 알람 화면 ─── */
+  #screen-alarm {
+    background: linear-gradient(160deg, #E53935, #B71C1C);
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .alarm-icon { font-size: 100px; animation: ring 0.5s ease infinite alternate; }
+  @keyframes ring { from { transform: rotate(-15deg); } to { transform: rotate(15deg); } }
+  .alarm-title { font-size: 28px; font-weight: 800; color: #fff; margin: 20px 0 10px; }
+  .alarm-summary { font-size: 22px; color: rgba(255,255,255,0.9); margin-bottom: 10px; line-height: 1.4; padding: 0 20px; }
+  .alarm-time { font-size: 18px; color: rgba(255,255,255,0.7); margin-bottom: 40px; }
+  .alarm-dismiss-btn {
+    background: #fff; color: var(--red);
+    border: none; border-radius: 24px;
+    padding: 20px 50px; font-size: 24px; font-weight: 800;
+    cursor: pointer; box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+  }
+
+  /* ─── 수정 화면 ─── */
+  #screen-edit { background: var(--bg); }
+  .edit-form { flex: 1; overflow-y: auto; padding: 20px 16px; }
+  .edit-label { font-size: 17px; font-weight: 700; color: var(--dark); margin-bottom: 8px; margin-top: 18px; }
+  .edit-input {
+    width: 100%; border: 2px solid #DDD8F5; border-radius: 14px;
+    padding: 14px 16px; font-size: 18px; font-family: inherit;
+    outline: none; background: var(--white); color: var(--dark);
+  }
+  .edit-input:focus { border-color: var(--p); }
+  .edit-save-btn {
+    background: var(--p); color: #fff;
+    border: none; border-radius: 16px;
+    padding: 18px; font-size: 20px; font-weight: 800;
+    width: calc(100% - 32px); margin: 20px 16px;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  /* ─── 스피너 ─── */
+  .spinner {
+    display: inline-block; width: 20px; height: 20px;
+    border: 3px solid rgba(108,60,225,0.3);
+    border-top-color: var(--p);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle; margin-left: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── 스크롤바 ─── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-thumb { background: #CCC; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ════ 메인 화면 ════ -->
+<div id="screen-main" class="screen active">
+  <div class="main-header">
+    <div class="main-title">🧠 기억 도우미</div>
+    <div class="main-subtitle">말씀해 주시면 제가 기억해 드릴게요</div>
+  </div>
+
+  <div class="main-date-box" id="mainDate">오늘 날짜를 불러오는 중...</div>
+
+  <div class="main-buttons">
+    <button class="main-btn main-btn-new" onclick="goToChat()">
+      <div class="btn-icon">🎤</div>
+      <div class="btn-label">
+        <div class="btn-main-text">새 기억</div>
+        <div class="btn-sub-text">말씀하시면 제가 정리해 드려요</div>
+      </div>
+    </button>
+    <button class="main-btn main-btn-check" onclick="goToList()">
+      <div class="btn-icon">📋</div>
+      <div class="btn-label">
+        <div class="btn-main-text">확인하기</div>
+        <div class="btn-sub-text">저장된 기억을 읽어 드릴게요</div>
+      </div>
+    </button>
+  </div>
+
+  <div class="today-badge" id="todayBadge" onclick="speakToday()">
+    <div class="badge-title">📅 오늘 일정</div>
+    <div class="badge-count" id="todayCount">불러오는 중...</div>
+  </div>
+
+
+</div>
+
+<!-- ════ 대화 화면 ════ -->
+<div id="screen-chat" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showScreen('main')">◀ 홈</button>
+    <h2>새 기억 입력</h2>
+  </div>
+
+  <div class="chat-messages" id="chatMessages">
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="typing-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chat-input-area">
+    <!-- 직접 마이크 버튼 -->
+    <button class="mic-direct-btn" id="micDirectBtn" onclick="toggleMic()">
+      <span class="mic-icon" id="micIcon">🎤</span>
+      <span class="mic-label">
+        <span class="mic-main" id="micMainText">눌러서 말하기</span>
+        <span class="mic-sub"  id="micSubText">버튼을 누르고 말씀해 주세요</span>
+      </span>
+    </button>
+    <div class="no-speech-note" id="noSpeechNote">⚠️ 마이크를 사용할 수 없어요. 아래 입력창을 이용해 주세요.</div>
+    <!-- 텍스트 입력 (보조) -->
+    <div class="input-row" style="margin-top:10px;">
+      <textarea
+        class="chat-textarea"
+        id="chatInput"
+        placeholder="또는 여기에 직접 입력하세요…"
+        rows="1"
+        oninput="autoResize(this)"
+      ></textarea>
+      <button class="send-btn" id="sendBtn" title="전송">▶</button>
+    </div>
+    <div class="voice-tip" id="voiceTip">💡 마이크가 안 되면 위 입력창에 직접 쓰세요</div>
+  </div>
+</div>
+
+<!-- ════ 목록 화면 ════ -->
+<div id="screen-list" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showScreen('main')">◀ 홈</button>
+    <h2>저장된 기억</h2>
+  </div>
+
+  <div class="list-tabs">
+    <button class="tab-btn active" onclick="switchTab('all', this)">전체</button>
+    <button class="tab-btn" onclick="switchTab('schedule', this)">일정</button>
+    <button class="tab-btn" onclick="switchTab('memo', this)">메모</button>
+    <button class="tab-btn" onclick="switchTab('today', this)">오늘</button>
+  </div>
+
+  <button class="read-all-btn" onclick="readAllToday()">
+    🔊 오늘 일정 전체 읽어드릴게요
+  </button>
+
+  <div class="memory-list" id="memoryList"></div>
+</div>
+
+<!-- ════ 알람 화면 ════ -->
+<div id="screen-alarm" class="screen">
+  <div class="alarm-icon">🔔</div>
+  <div class="alarm-title">알림이 왔어요!</div>
+  <div class="alarm-summary" id="alarmSummary"></div>
+  <div class="alarm-time" id="alarmTime"></div>
+  <button class="alarm-dismiss-btn" onclick="dismissAlarm()">✅ 확인했어요</button>
+</div>
+
+<!-- ════ 수정 화면 ════ -->
+<div id="screen-edit" class="screen">
+  <div class="top-bar">
+    <button class="back-btn" onclick="showScreen('list')">◀ 목록</button>
+    <h2>기억 수정</h2>
+  </div>
+  <div class="edit-form">
+    <input type="hidden" id="editId"/>
+    <div class="edit-label">📝 내용</div>
+    <textarea class="edit-input" id="editSummary" rows="3"></textarea>
+    <div class="edit-label">📅 날짜 (예: 2025-03-15)</div>
+    <input type="date" class="edit-input" id="editDate"/>
+    <div class="edit-label">⏰ 시간 (예: 14:00)</div>
+    <input type="time" class="edit-input" id="editTime"/>
+    <div class="edit-label">⏱ 알람 (분 전, 0=없음)</div>
+    <input type="number" class="edit-input" id="editAlarm" placeholder="예: 30" min="0"/>
+  </div>
+  <button class="edit-save-btn" onclick="saveEdit()">💾 저장</button>
+</div>
+
+<script>
+/* ══════════════════════════════════
+   상태 & 데이터
+══════════════════════════════════ */
+const STORAGE_KEY = 'giogi_v3';
+const API_KEY_STORAGE = 'giogi_api_key';
+const BUILT_IN_API_KEY = 'AIzaSyAGJOmlzZrEGxGy9TFczATnES79qPZgL5c';
+let memories = [];
+let chatHistory = [];
+let pendingSaveData = null;
+let currentAlarmId = null;
+let alarmTimers = {};
+let editingId = null;
+let currentTab = 'all';
+let isSpeaking = false;
+let speechSynth = window.speechSynthesis;
+let currentAudio = null;
+// 음성 인식
+let recognition = null;
+let isListening = false;
+
+/* ══════════════════════════════════
+   초기화
+══════════════════════════════════ */
+function init() {
+  memories = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  localStorage.setItem(API_KEY_STORAGE, BUILT_IN_API_KEY);
+  updateMainDate();
+  updateTodayBadge();
+  rescheduleAllAlarms();
+  initSpeechRecognition();
+
+}
+
+function checkApiKey() { /* API 키 내장됨 */ }
+function saveApiKey() { /* API 키 내장됨 */ }
+
+/* ══════════════════════════════════
+   직접 마이크 (Web Speech API)
+══════════════════════════════════ */
+function initSpeechRecognition() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('micDirectBtn');
+  const note = document.getElementById('noSpeechNote');
+
+  if (!SpeechRecognition || location.protocol === 'file:') {
+    // 지원 안 됨 → 버튼 비활성, 안내 표시
+    if (btn) btn.disabled = true;
+    if (note) {
+      note.style.display = 'block';
+      note.textContent = location.protocol === 'file:'
+        ? '⚠️ 파일로 열면 마이크를 쓸 수 없어요. 웹 주소(https://)로 열어 주세요.'
+        : '⚠️ 이 브라우저는 마이크를 지원하지 않아요. Chrome을 사용해 주세요.';
+    }
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.lang = 'ko-KR';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = () => {
+    isListening = true;
+    const b = document.getElementById('micDirectBtn');
+    const icon = document.getElementById('micIcon');
+    const main = document.getElementById('micMainText');
+    const sub  = document.getElementById('micSubText');
+    if (b)    b.classList.add('listening');
+    if (icon) icon.textContent = '⏹';
+    if (main) main.textContent = '듣고 있어요…';
+    if (sub)  sub.textContent  = '말씀이 끝나면 자동으로 전송돼요';
+    stopSpeaking();
+  };
+
+  recognition.onresult = (e) => {
+    let interim = '', final = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      e.results[i].isFinal ? final += t : interim += t;
+    }
+    const input = document.getElementById('chatInput');
+    if (input) {
+      input.value = final || interim;
+      autoResize(input);
+    }
+    // 최종 결과면 자동 전송
+    if (final) {
+      recognition.stop();
+      setTimeout(() => sendMessagePatched(), 300);
+    }
+  };
+
+  recognition.onerror = (e) => {
+    isListening = false;
+    resetMicBtn();
+    const note = document.getElementById('noSpeechNote');
+    if (e.error === 'not-allowed') {
+      if (note) { note.style.display = 'block'; note.textContent = '⚠️ 마이크 권한이 거부됐어요. 브라우저 설정에서 마이크를 허용해 주세요.'; }
+    }
+  };
+
+  recognition.onend = () => {
+    isListening = false;
+    resetMicBtn();
+  };
+}
+
+function toggleMic() {
+  if (!recognition) return;
+  if (isListening) {
+    recognition.stop();
+  } else {
+    document.getElementById('chatInput').value = '';
+    try { recognition.start(); }
+    catch(e) { console.warn('recognition start error', e); }
+  }
+}
+
+function resetMicBtn() {
+  const b    = document.getElementById('micDirectBtn');
+  const icon = document.getElementById('micIcon');
+  const main = document.getElementById('micMainText');
+  const sub  = document.getElementById('micSubText');
+  if (b)    b.classList.remove('listening');
+  if (icon) icon.textContent = '🎤';
+  if (main) main.textContent = '눌러서 말하기';
+  if (sub)  sub.textContent  = '버튼을 누르고 말씀해 주세요';
+}
+
+/* ══════════════════════════════════
+   화면 전환
+══════════════════════════════════ */
+function showScreen(name) {
+  stopSpeaking();
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  if (name === 'list') renderList();
+}
+
+function goToChat() {
+  showScreen('chat');
+  resetChat();
+  setTimeout(() => startConversation(), 200);
+}
+
+function goToList() {
+  showScreen('list');
+}
+
+/* ══════════════════════════════════
+   날짜 / 배지
+══════════════════════════════════ */
+function updateMainDate() {
+  const now = new Date();
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const str = `${now.getFullYear()}년 ${now.getMonth()+1}월 ${now.getDate()}일 (${days[now.getDay()]})`;
+  document.getElementById('mainDate').textContent = str;
+}
+
+function updateTodayBadge() {
+  const today = new Date();
+  const todayStr = dateStr(today);
+  const todayItems = memories.filter(m => m.date === todayStr);
+  const el = document.getElementById('todayCount');
+  if (todayItems.length === 0) {
+    el.textContent = '오늘 일정이 없어요';
+  } else {
+    el.textContent = `오늘 ${todayItems.length}개 · 누르면 읽어드려요 🔊`;
+  }
+}
+
+function speakToday() {
+  const today = new Date();
+  const todayStr = dateStr(today);
+  const items = memories.filter(m => m.date === todayStr)
+    .sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  if (items.length === 0) {
+    speakText('오늘 등록된 일정이 없습니다.');
+    return;
+  }
+  let text = `오늘 일정은 총 ${items.length}개입니다. `;
+  items.forEach((m, i) => {
+    text += `${i+1}번. `;
+    if (m.time) text += `${formatTime(m.time)}에 `;
+    text += m.summary + '. ';
+  });
+  speakText(text);
+}
+
+/* ══════════════════════════════════
+   TTS
+══════════════════════════════════ */
+function speakText(text) {
+  stopSpeaking();
+  if (!speechSynth) return;
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'ko-KR';
+  utt.rate = 0.85;
+  utt.pitch = 1.0;
+  utt.volume = 1.0;
+  // 한국어 음성 선택
+  const voices = speechSynth.getVoices();
+  const koVoice = voices.find(v => v.lang.startsWith('ko'));
+  if (koVoice) utt.voice = koVoice;
+  isSpeaking = true;
+  utt.onend = () => { isSpeaking = false; };
+  utt.onerror = () => { isSpeaking = false; };
+  speechSynth.speak(utt);
+}
+
+function stopSpeaking() {
+  if (speechSynth) speechSynth.cancel();
+  isSpeaking = false;
+}
+
+/* ══════════════════════════════════
+   대화형 AI (Gemini 2.5 Flash)
+══════════════════════════════════ */
+const SYSTEM_PROMPT = `당신은 80대 어르신을 돕는 친절하고 따뜻한 AI 기억 도우미입니다.
+어르신이 기억하고 싶은 것을 말씀하시면, 대화를 통해 정보를 파악하고 정리해 드립니다.
+
+역할 수행 규칙:
+1. 항상 한국어로만 대화하세요.
+2. 짧고 명확한 문장으로 말하세요. 한 번에 한 가지만 물어보세요.
+3. 어르신이 두서없이 말씀하셔도 이해하고 정리해 드리세요.
+4. 날짜/시간 정보가 있으면 파악하세요. 없으면 물어보세요.
+5. "오늘", "내일", "이번 주 목요일", "다음 달" 같은 표현을 실제 날짜로 변환하세요.
+6. 정보가 충분히 모이면 정리하여 확인을 요청하세요.
+7. 어르신이 확인하시면 반드시 아래 형식으로 JSON을 출력하세요:
+
+[SAVE_MEMORY]
+{
+  "summary": "간결한 요약 (예: 병원 진료)",
+  "detail": "상세 내용",
+  "date": "YYYY-MM-DD 또는 null",
+  "time": "HH:MM 또는 null",
+  "hasDate": true/false,
+  "type": "schedule 또는 memo"
+}
+[/SAVE_MEMORY]
+
+8. 알람 설정은 JSON 저장 후에 별도로 물어보세요.
+9. 어르신이 수정/취소를 원하시면 언제든지 도와드리세요.
+10. 존댓말을 사용하고 다정하게 대해주세요.
+
+오늘 날짜: ${getTodayString()}`;
+
+function getTodayString() {
+  const d = new Date();
+  return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${['일','월','화','수','목','금','토'][d.getDay()]}요일)`;
+}
+
+async function callGemini(userMessage) {
+  const apiKey = localStorage.getItem(API_KEY_STORAGE);
+  if (!apiKey) {
+    return '⚠️ Gemini API 키가 없어요. 홈 화면에서 API 키를 먼저 입력해 주세요.\n\n키 없이도 기본 모드로 도와드릴게요. 무엇을 기억하고 싶으신가요?';
+  }
+
+  chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+
+  const requestBody = {
+    system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: chatHistory,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1024,
+      responseMimeType: 'text/plain'
+    }
+  };
+
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      if (res.status === 400) return '⚠️ API 키가 올바르지 않아요. 키를 다시 확인해 주세요.';
+      if (res.status === 429) {
+        // 자동 재시도 (3초 후)
+        await new Promise(r => setTimeout(r, 3000));
+        return callGemini(userMessage);
+      }
+      return `⚠️ AI 연결 오류 (${res.status}). 잠시 후 다시 시도해 주세요.`;
+    }
+    const data = await res.json();
+    const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '죄송해요, 다시 말씀해 주세요.';
+    chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
+    return aiText;
+  } catch (e) {
+    return '⚠️ 인터넷 연결을 확인해 주세요. 연결이 안 되면 다시 시도해 주세요.';
+  }
+}
+
+/* ══════════════════════════════════
+   대화 UI
+══════════════════════════════════ */
+function resetChat() {
+  chatHistory = [];
+  pendingSaveData = null;
+  document.getElementById('chatMessages').innerHTML = `
+    <div class="typing-indicator" id="typingIndicator">
+      <div class="typing-dots"><span></span><span></span><span></span></div>
+    </div>`;
+  document.getElementById('chatInput').value = '';
+}
+
+function addMessage(text, type, skipSpeak) {
+  const container = document.getElementById('chatMessages');
+  const typingEl = document.getElementById('typingIndicator');
+
+  const div = document.createElement('div');
+  div.className = `msg msg-${type}`;
+
+  if (type === 'ai') {
+    div.innerHTML = `<div class="ai-label">🤖 기억 도우미</div>${escHtml(text)}`;
+    if (!skipSpeak) speakText(text.replace(/\[SAVE_MEMORY\][\s\S]*?\[\/SAVE_MEMORY\]/g, ''));
+  } else if (type === 'user') {
+    div.textContent = text;
+  } else {
+    div.textContent = text;
+    div.className = 'msg msg-system';
+  }
+
+  container.insertBefore(div, typingEl);
+  container.scrollTop = container.scrollHeight;
+  return div;
+}
+
+function showTyping(show) {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.style.display = show ? 'block' : 'none';
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+async function startConversation() {
+  showTyping(true);
+  const greeting = await callGemini('안녕하세요, 새 기억을 입력하려고 합니다.');
+  showTyping(false);
+  addMessage(greeting, 'ai');
+}
+
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  document.getElementById('sendBtn').disabled = true;
+
+  addMessage(text, 'user', true);
+
+  // 저장 확인 버튼이 있는 경우 처리
+  if (pendingSaveData) {
+    const lower = text.toLowerCase();
+    if (/네|예|맞아|맞습니다|좋아|저장|확인|ㅇㅇ/.test(text)) {
+      handleConfirmSave(true);
+      document.getElementById('sendBtn').disabled = false;
+      return;
+    } else if (/아니|틀렸|취소|다시|수정/.test(text)) {
+      handleConfirmSave(false);
+      document.getElementById('sendBtn').disabled = false;
+      return;
+    }
+  }
+
+  showTyping(true);
+  const aiReply = await callGemini(text);
+  showTyping(false);
+
+  // SAVE_MEMORY 파싱
+  const saveMatch = aiReply.match(/\[SAVE_MEMORY\]([\s\S]*?)\[\/SAVE_MEMORY\]/);
+  if (saveMatch) {
+    try {
+      const jsonStr = saveMatch[1].trim();
+      const saveData = JSON.parse(jsonStr);
+      pendingSaveData = saveData;
+
+      // AI 일반 텍스트 출력 (JSON 제외)
+      const displayText = aiReply.replace(/\[SAVE_MEMORY\][\s\S]*?\[\/SAVE_MEMORY\]/g, '').trim();
+      if (displayText) addMessage(displayText, 'ai');
+
+      // 확인 카드 표시
+      showSaveCard(saveData);
+    } catch(e) {
+      addMessage(aiReply, 'ai');
+    }
+  } else {
+    addMessage(aiReply, 'ai');
+  }
+
+  document.getElementById('sendBtn').disabled = false;
+}
+
+function showSaveCard(data) {
+  const container = document.getElementById('chatMessages');
+  const typingEl = document.getElementById('typingIndicator');
+
+  const card = document.createElement('div');
+  card.className = 'save-card';
+  card.innerHTML = `
+    <div class="sc-title">💾 이렇게 저장할까요?</div>
+    <div class="sc-summary">${escHtml(data.summary)}</div>
+    <div class="sc-detail">
+      ${data.date ? `📅 ${formatDateKor(data.date)}` : '📝 날짜 없는 메모'}<br>
+      ${data.time ? `⏰ ${formatTime(data.time)}` : ''}
+      ${data.detail && data.detail !== data.summary ? `<br>📋 ${escHtml(data.detail)}` : ''}
+    </div>
+    <div class="save-card-btns">
+      <button class="btn-confirm-save" onclick="handleConfirmSave(true)">✅ 네, 저장해요</button>
+      <button class="btn-cancel-save" onclick="handleConfirmSave(false)">✏️ 수정할게요</button>
+    </div>`;
+
+  container.insertBefore(card, typingEl);
+  container.scrollTop = container.scrollHeight;
+  speakText(`${data.summary}(으)로 저장할까요? 맞으면 네, 수정이 필요하면 수정할게요라고 말씀해 주세요.`);
+}
+
+async function handleConfirmSave(confirmed) {
+  if (!pendingSaveData) return;
+
+  if (confirmed) {
+    const saved = saveMemoryFromData(pendingSaveData);
+    pendingSaveData = null;
+    updateTodayBadge();
+
+    addMessage('✅ 저장되었어요! 알람을 설정하시겠어요? (예: 30분 전, 1시간 전, 필요 없어요)', 'ai');
+    speakText('저장되었어요! 알람을 설정하시겠어요? 30분 전, 1시간 전, 아니면 필요 없다고 말씀해 주세요.');
+
+    // 알람 대화 시작
+    chatHistory.push({
+      role: 'model',
+      parts: [{ text: `저장이 완료되었습니다. 알람 설정: 알람이 필요하시면 "30분 전", "1시간 전", "하루 전" 등으로 말씀해 주세요. 필요 없으시면 "필요 없어요"라고 하세요.` }]
+    });
+    window._lastSavedId = saved.id;
+  } else {
+    pendingSaveData = null;
+    showTyping(true);
+    const reply = await callGemini('저장을 취소하고 다시 입력할게요. 뭘 수정할지 도와주세요.');
+    showTyping(false);
+    addMessage(reply, 'ai');
+  }
+}
+
+function saveMemoryFromData(data) {
+  const id = 'mem_' + Date.now();
+  const mem = {
+    id,
+    summary: data.summary,
+    detail: data.detail || data.summary,
+    date: data.date || null,
+    time: data.time || null,
+    hasDate: data.hasDate,
+    type: data.type || (data.hasDate ? 'schedule' : 'memo'),
+    alarm: null,
+    createdAt: new Date().toISOString()
+  };
+  memories.push(mem);
+  saveMemories();
+  return mem;
+}
+
+/* ══════════════════════════════════
+   알람 처리
+══════════════════════════════════ */
+function parseAlarmMinutes(text) {
+  if (/필요\s*없|안\s*해도|괜찮|됐어|없어/.test(text)) return -1;
+  if (/하루\s*전|24시간/.test(text)) return 1440;
+  if (/3시간/.test(text)) return 180;
+  if (/2시간/.test(text)) return 120;
+  if (/1시간|한\s*시간/.test(text)) return 60;
+  if (/30분/.test(text)) return 30;
+  if (/15분/.test(text)) return 15;
+  if (/10분/.test(text)) return 10;
+  const m = text.match(/(\d+)\s*시간/);
+  if (m) return parseInt(m[1]) * 60;
+  const m2 = text.match(/(\d+)\s*분/);
+  if (m2) return parseInt(m2[1]);
+  return null;
+}
+
+function scheduleAlarm(memId, minutesBefore) {
+  const mem = memories.find(m => m.id === memId);
+  if (!mem || !mem.date) return;
+  const dt = new Date(`${mem.date}T${mem.time || '09:00'}:00`);
+  const alarmTime = new Date(dt.getTime() - minutesBefore * 60000);
+  const now = new Date();
+  const delay = alarmTime - now;
+  if (delay <= 0) return;
+
+  mem.alarm = minutesBefore;
+  mem.alarmTime = alarmTime.toISOString();
+  saveMemories();
+
+  if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
+  alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), delay);
+}
+
+function rescheduleAllAlarms() {
+  memories.forEach(m => {
+    if (m.alarm && m.alarmTime) {
+      const alarmDt = new Date(m.alarmTime);
+      const delay = alarmDt - new Date();
+      if (delay > 0) {
+        if (alarmTimers[m.id]) clearTimeout(alarmTimers[m.id]);
+        alarmTimers[m.id] = setTimeout(() => triggerAlarm(m.id), delay);
+      }
+    }
+  });
+}
+
+function triggerAlarm(memId) {
+  const mem = memories.find(m => m.id === memId);
+  if (!mem) return;
+  currentAlarmId = memId;
+  document.getElementById('alarmSummary').textContent = mem.summary;
+  document.getElementById('alarmTime').textContent = mem.date ? `${formatDateKor(mem.date)} ${mem.time ? formatTime(mem.time) : ''}` : '';
+  showScreen('alarm');
+  playAlarmChime();
+  setTimeout(() => speakText(`알림입니다. ${mem.summary}`), 600);
+}
+
+function dismissAlarm() {
+  stopAlarmChime();
+  showScreen('main');
+}
+
+let chimeInterval = null;
+function playAlarmChime() {
+  stopAlarmChime();
+  if (!window.AudioContext && !window.webkitAudioContext) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AudioCtx();
+  function beep() {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880;
+    o.type = 'sine';
+    g.gain.setValueAtTime(0.4, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+    o.start(ctx.currentTime);
+    o.stop(ctx.currentTime + 0.8);
+  }
+  beep();
+  chimeInterval = setInterval(beep, 2000);
+  window._alarmCtx = ctx;
+}
+function stopAlarmChime() {
+  if (chimeInterval) { clearInterval(chimeInterval); chimeInterval = null; }
+  if (window._alarmCtx) { try { window._alarmCtx.close(); } catch(e){} window._alarmCtx = null; }
+}
+
+/* ══════════════════════════════════
+   목록 화면
+══════════════════════════════════ */
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function renderList() {
+  const container = document.getElementById('memoryList');
+  const today = dateStr(new Date());
+  let items = [...memories].sort((a,b) => {
+    if (a.date && b.date) return a.date.localeCompare(b.date);
+    if (a.date) return -1;
+    if (b.date) return 1;
+    return new Date(b.createdAt) - new Date(a.createdAt);
+  });
+
+  if (currentTab === 'today') items = items.filter(m => m.date === today);
+  else if (currentTab === 'schedule') items = items.filter(m => m.hasDate && m.date);
+  else if (currentTab === 'memo') items = items.filter(m => !m.hasDate || !m.date);
+
+  if (items.length === 0) {
+    container.innerHTML = `<div class="empty-msg"><span class="empty-icon">📭</span>저장된 기억이 없어요</div>`;
+    return;
+  }
+
+  container.innerHTML = items.map(m => {
+    const isToday = m.date === today;
+    const isPast = m.date && m.date < today;
+    const isMemo = !m.hasDate || !m.date;
+    let cardClass = isPast ? 'past' : isMemo ? 'memo' : isToday ? 'today' : '';
+    let badgeText = isMemo ? '메모' : isToday ? '오늘' : isPast ? '지난일정' : '예정';
+    let badgeClass = isMemo ? 'badge-memo' : isToday ? 'badge-today' : isPast ? 'badge-past' : 'badge-upcoming';
+
+    return `<div class="memory-card ${cardClass}">
+      <div class="mc-header">
+        <div class="mc-summary">${escHtml(m.summary)}</div>
+        <span class="mc-badge ${badgeClass}">${badgeText}</span>
+      </div>
+      ${m.date ? `<div class="mc-datetime">📅 ${formatDateKor(m.date)}${m.time ? ' ' + formatTime(m.time) : ''}</div>` : ''}
+      ${m.alarm ? `<div class="mc-alarm">🔔 ${m.alarm}분 전 알람 설정됨</div>` : ''}
+      ${m.detail && m.detail !== m.summary ? `<div class="mc-original">📋 ${escHtml(m.detail)}</div>` : ''}
+      <div class="mc-actions">
+        <button class="btn-speak" onclick="speakMemory('${m.id}')">🔊</button>
+        <button class="btn-edit" onclick="openEdit('${m.id}')">✏️ 수정</button>
+        <button class="btn-delete" onclick="deleteMemory('${m.id}')">🗑️ 삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function speakMemory(id) {
+  const m = memories.find(x => x.id === id);
+  if (!m) return;
+  let text = m.summary + '. ';
+  if (m.date) text += `날짜는 ${formatDateKor(m.date)}. `;
+  if (m.time) text += `시간은 ${formatTime(m.time)}. `;
+  if (m.detail && m.detail !== m.summary) text += m.detail;
+  speakText(text);
+}
+
+function readAllToday() {
+  const today = dateStr(new Date());
+  const items = memories.filter(m => m.date === today)
+    .sort((a,b) => (a.time||'').localeCompare(b.time||''));
+  if (items.length === 0) {
+    speakText('오늘 등록된 일정이 없습니다.');
+    return;
+  }
+  let text = `오늘 일정을 읽어드릴게요. 총 ${items.length}개입니다. `;
+  items.forEach((m,i) => {
+    text += `${i+1}번, `;
+    if (m.time) text += `${formatTime(m.time)}에 `;
+    text += m.summary + '. ';
+  });
+  speakText(text);
+}
+
+function deleteMemory(id) {
+  const m = memories.find(x => x.id === id);
+  if (!m) return;
+  if (!confirm(`"${m.summary}"를 삭제할까요?`)) return;
+  memories = memories.filter(x => x.id !== id);
+  if (alarmTimers[id]) { clearTimeout(alarmTimers[id]); delete alarmTimers[id]; }
+  saveMemories();
+  updateTodayBadge();
+  renderList();
+}
+
+/* ══════════════════════════════════
+   수정 화면
+══════════════════════════════════ */
+function openEdit(id) {
+  const m = memories.find(x => x.id === id);
+  if (!m) return;
+  editingId = id;
+  document.getElementById('editId').value = id;
+  document.getElementById('editSummary').value = m.summary;
+  document.getElementById('editDate').value = m.date || '';
+  document.getElementById('editTime').value = m.time || '';
+  document.getElementById('editAlarm').value = m.alarm || '';
+  showScreen('edit');
+}
+
+function saveEdit() {
+  const id = document.getElementById('editId').value;
+  const m = memories.find(x => x.id === id);
+  if (!m) return;
+  m.summary = document.getElementById('editSummary').value.trim() || m.summary;
+  m.date = document.getElementById('editDate').value || null;
+  m.time = document.getElementById('editTime').value || null;
+  m.hasDate = !!m.date;
+  m.type = m.hasDate ? 'schedule' : 'memo';
+  const alarmVal = parseInt(document.getElementById('editAlarm').value);
+  if (!isNaN(alarmVal) && alarmVal > 0 && m.date) {
+    scheduleAlarm(id, alarmVal);
+  }
+  saveMemories();
+  updateTodayBadge();
+  speakText('수정되었습니다.');
+  showScreen('list');
+}
+
+/* ══════════════════════════════════
+   저장/유틸
+══════════════════════════════════ */
+function saveMemories() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(memories));
+}
+
+function dateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function formatDateKor(dateStr) {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  const dt = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
+  const days = ['일','월','화','수','목','금','토'];
+  return `${y}년 ${parseInt(m)}월 ${parseInt(d)}일 (${days[dt.getDay()]}요일)`;
+}
+
+function formatTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':');
+  const hour = parseInt(h);
+  return `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour-12}시${m !== '00' ? ` ${parseInt(m)}분` : ''}`;
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+
+/* ══════════════════════════════════
+   알람 텍스트 파싱 hook (대화 중)
+══════════════════════════════════ */
+const _origSend = sendMessage;
+// 알람 인식을 위해 sendMessage 흐름에 후킹
+// AI가 알람 질문에 응답할 때 처리
+document.addEventListener('DOMContentLoaded', () => {
+  // 전역 sendMessage는 이미 정의됨
+});
+
+/* ══════════════════════════════════
+   Alarm mention detection after save
+══════════════════════════════════ */
+// sendMessage 내에서 window._lastSavedId가 설정되면
+// 다음 사용자 입력에서 알람 파싱 시도
+const _sendBtn = document.getElementById('sendBtn');
+const _chatInput = document.getElementById('chatInput');
+
+// 패치: sendMessage 후처리
+async function sendMessagePatched() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+
+  // 알람 파싱 (저장 직후 상태)
+  if (window._lastSavedId && !pendingSaveData) {
+    const mins = parseAlarmMinutes(text);
+    if (mins !== null) {
+      input.value = '';
+      addMessage(text, 'user', true);
+
+      if (mins === -1) {
+        addMessage('알람 없이 저장되었어요! 다른 기억을 추가하시겠어요?', 'ai');
+        window._lastSavedId = null;
+      } else {
+        scheduleAlarm(window._lastSavedId, mins);
+        addMessage(`✅ ${mins}분 전에 알람을 설정했어요! 다른 기억도 추가하시겠어요?`, 'ai');
+        speakText(`${mins}분 전에 알람을 설정했어요.`);
+        window._lastSavedId = null;
+      }
+      return;
+    }
+  }
+
+  // 일반 흐름
+  await sendMessage();
+}
+
+document.getElementById('sendBtn').onclick = sendMessagePatched;
+
+/* ══════════════════════════════════
+   시작
+══════════════════════════════════ */
+window.addEventListener('load', init);
+window.speechSynthesis.onvoiceschanged = () => {};
+</script>
+</body>
+</html>
