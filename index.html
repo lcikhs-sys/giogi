@@ -919,6 +919,8 @@ async function callGemini(userMessage) {
   }
 
   chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+  // 토큰 초과 방지: 최근 10개메시지만 유지
+  if (chatHistory.length > 10) chatHistory = chatHistory.slice(-10);
 
   const requestBody = {
     system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
@@ -1215,23 +1217,26 @@ function dismissAlarm() {
 let chimeInterval = null;
 function playAlarmChime() {
   stopAlarmChime();
-  if (!window.AudioContext && !window.webkitAudioContext) return;
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AudioCtx();
+  // 전역 AudioContext 재사용 (모바일 unlock 후)
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) { speakText('알람입니다'); return; }
+  const ctx = window._globalAudioCtx || new AC();
+  window._alarmCtx = ctx;
   function beep() {
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value = 880;
-    o.type = 'sine';
-    g.gain.setValueAtTime(0.4, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
-    o.start(ctx.currentTime);
-    o.stop(ctx.currentTime + 0.8);
+    ctx.resume().then(() => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880;
+      o.type = 'sine';
+      g.gain.setValueAtTime(0.5, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.0);
+      o.start(ctx.currentTime);
+      o.stop(ctx.currentTime + 1.0);
+    });
   }
   beep();
-  chimeInterval = setInterval(beep, 2000);
-  window._alarmCtx = ctx;
+  chimeInterval = setInterval(beep, 2200);
 }
 function stopAlarmChime() {
   if (chimeInterval) { clearInterval(chimeInterval); chimeInterval = null; }
@@ -1494,6 +1499,17 @@ window.addEventListener('load', () => {
   history.pushState({ screen: 'main' }, '');
 });
 window.speechSynthesis.onvoiceschanged = () => {};
+
+// 모바일 오디오 사전 활성화 (첫 터치 시 AudioContext unlock)
+document.addEventListener('touchstart', () => {
+  if (!window._globalAudioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      window._globalAudioCtx = new AC();
+      window._globalAudioCtx.resume();
+    }
+  }
+}, { once: false });
 </script>
 </body>
 </html>
