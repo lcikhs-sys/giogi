@@ -1185,6 +1185,33 @@ function parseAlarmMinutes(text) {
   return null;
 }
 
+// 갤럭시 기본 시계 앱에 알람 등록 (Android Intent)
+function setNativeAlarm(alarmTime, label) {
+  const h = alarmTime.getHours();
+  const m = alarmTime.getMinutes();
+  const msg = encodeURIComponent(label);
+
+  // Android Chrome: 기본 시계 앱 알람 등록 Intent
+  const intentUrl = `intent:#Intent;action=android.intent.action.SET_ALARM;` +
+    `i.android.intent.extra.alarm.HOUR=${h};` +
+    `i.android.intent.extra.alarm.MINUTES=${m};` +
+    `S.android.intent.extra.alarm.MESSAGE=${msg};` +
+    `Z.android.intent.extra.alarm.SKIP_UI=false;end`;
+
+  // iOS: 시계 앱 연기 (iOS는 알람 직접 등록 불가 → 안내만)
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS) {
+    return false; // iOS는 Intent 불가
+  }
+
+  try {
+    window.location.href = intentUrl;
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
 function scheduleAlarm(memId, minutesBefore) {
   const mem = memories.find(m => m.id === memId);
   if (!mem || !mem.date) return;
@@ -1192,19 +1219,29 @@ function scheduleAlarm(memId, minutesBefore) {
   const alarmTime = new Date(dt.getTime() - minutesBefore * 60000);
   const now = new Date();
   const delay = alarmTime - now;
-  if (delay <= 0) return;
 
   mem.alarm = minutesBefore;
   mem.alarmTime = alarmTime.toISOString();
   saveMemories();
 
-  // 브라우저 알림 권한 요청
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission();
-  }
+  // 휘대폰 기본 시계 앱에 알람 등록 (가장 확실한 방법)
+  const label = mem.summary || '기억 도우미 알람';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-  if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
-  alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), delay);
+  if (delay > 0) {
+    if (!isIOS) {
+      // Android: 기본 시계 앱에 알람 등록
+      setNativeAlarm(alarmTime, label);
+    } else {
+      // iOS: 알람 시간 안내 메시지 표시
+      const hStr = String(alarmTime.getHours()).padStart(2,'0');
+      const mStr = String(alarmTime.getMinutes()).padStart(2,'0');
+      addMessage(`하는 방법: 페이지 음\n\uae30본 시계 앱에서 ${hStr}:${mStr} 알람을 직접 등록해 주세요.`, 'system');
+    }
+    // 백업용 setTimeout (앱 켜지면 외 알람의 보조)
+    if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
+    alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), delay);
+  }
 }
 
 function rescheduleAllAlarms() {
@@ -1486,9 +1523,15 @@ async function sendMessagePatched() {
         window._lastSavedId = null;
       } else {
         scheduleAlarm(window._lastSavedId, mins);
-        const minLabel = mins >= 60 ? `${mins/60}시간` : `${mins}분`;
-        addMessage(`${minLabel} 전 알람 설정했어요.`, 'ai');
-        speakText(`${minLabel} 전 알람 설정했어요.`);
+        const mem = memories.find(m => m.id === window._lastSavedId);
+        const alarmDt = mem && mem.alarmTime ? new Date(mem.alarmTime) : null;
+        const timeStr = alarmDt ? `${String(alarmDt.getHours()).padStart(2,'0')}:${String(alarmDt.getMinutes()).padStart(2,'0')}` : '';
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const msg = isIOS
+          ? `기본 시계 앱에서 ${timeStr} 알람을 직접 설정해 주세요.`
+          : `휴대폰 시계 앱이 열립니다. 확인 누르면 ${timeStr} 알람이 설정됩니다.`;
+        addMessage(msg, 'ai');
+        speakText(msg);
         window._lastSavedId = null;
       }
       return;
