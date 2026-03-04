@@ -644,7 +644,7 @@
 ══════════════════════════════════ */
 const STORAGE_KEY = 'giogi_v3';
 const API_KEY_STORAGE = 'giogi_api_key';
-const BUILT_IN_API_KEY = '';
+const GROQ_API_KEY = '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';
 let memories = [];
 let chatHistory = [];
 let pendingSaveData = null;
@@ -665,11 +665,9 @@ let isListening = false;
 ══════════════════════════════════ */
 function init() {
   memories = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  if (!localStorage.getItem(API_KEY_STORAGE)) {
-    showScreen('setup');
-    return;
-  }
-  showScreen('main'); // 키 있으면 메인 화면으로
+  // Groq 키 자동 저장 (setup 화면 불필요)
+  localStorage.setItem(API_KEY_STORAGE, GROQ_API_KEY);
+  showScreen('main');
   updateMainDate();
   updateTodayBadge();
   rescheduleAllAlarms();
@@ -915,35 +913,38 @@ function getTodayString() {
   return `${d.getFullYear()}년 ${d.getMonth()+1}월 ${d.getDate()}일 (${['일','월','화','수','목','금','토'][d.getDay()]}요일)`;
 }
 
-// API만 호출하는 내부 함수 (chatHistory push 없음, 재시도 전용)
-async function _fetchGemini(apiKey, requestBody, retryCount) {
+// Groq API 호출 (재시도 전용, chatHistory push 없음)
+async function _fetchGroq(messages, retryCount) {
   retryCount = retryCount || 0;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-        signal: controller.signal
-      }
-    );
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + GROQ_API_KEY
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: messages,
+        max_tokens: 512,
+        temperature: 0.7
+      }),
+      signal: controller.signal
+    });
     clearTimeout(timer);
     if (!res.ok) {
-      if (res.status === 400) return 'API 키가 잘못되었어요.';
-      if (res.status === 403) return 'API 키가 차단되었어요. AI Studio에서 새 키를 발급하세요.';
+      if (res.status === 401) return 'API 키가 잘못되었어요.';
       if (res.status === 429) {
-        if (retryCount >= 1) return '잠긄 사용량이 찼어요. 1분 후 다시 말씀해 주세요.';
-        await new Promise(r => setTimeout(r, 5000));
-        return _fetchGemini(apiKey, requestBody, retryCount + 1);
+        if (retryCount >= 1) return '잠긄 사용량이 찼어요. 잠시 후 다시 말씀해 주세요.';
+        await new Promise(r => setTimeout(r, 3000));
+        return _fetchGroq(messages, retryCount + 1);
       }
-      const errText = await res.text().catch(() => '');
-      return `AI 오류 (${res.status}). 다시 시도해 주세요.`;
+      return 'AI 오류 (' + res.status + '). 다시 시도해 주세요.';
     }
     const data = await res.json();
-    return data.candidates?.[0]?.content?.parts?.[0]?.text || '다시 말씀해 주세요.';
+    return data.choices?.[0]?.message?.content || '다시 말씀해 주세요.';
   } catch (e) {
     clearTimeout(timer);
     if (e.name === 'AbortError') return '시간이 초과되었어요. 다시 말씀해 주세요.';
@@ -952,38 +953,29 @@ async function _fetchGemini(apiKey, requestBody, retryCount) {
 }
 
 async function callGemini(userMessage) {
-  const apiKey = localStorage.getItem(API_KEY_STORAGE);
-  if (!apiKey) {
-    return 'API 키가 없어요. 처음 화면에서 키를 입력해 주세요.';
-  }
-
-  // userMessage가 있을 때만 push (startConversation의 '시작' 메시지는 history에 넣지 않음)
+  // userMessage가 있을 때만 history에 push
   if (userMessage && userMessage !== '__start__') {
-    chatHistory.push({ role: 'user', parts: [{ text: userMessage }] });
+    chatHistory.push({ role: 'user', content: userMessage });
   }
-  // 토큰 초과 방지: 최근 6개 메시지만 유지
+  // 토큰 초과 방지: 최근 6개만 유지
   if (chatHistory.length > 6) chatHistory = chatHistory.slice(-6);
 
-  const requestBody = {
-    system_instruction: { parts: [{ text: getSYSTEM_PROMPT() }] },
-    contents: chatHistory.length > 0 ? chatHistory : [{ role: 'user', parts: [{ text: '시작' }] }],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 512
-    }
-  };
+  // Groq OpenAI 포맷: system 메시지 + history
+  const messages = [
+    { role: 'system', content: getSYSTEM_PROMPT() },
+    ...chatHistory
+  ];
 
   try {
-    const aiText = await _fetchGemini(apiKey, requestBody, 0);
-    // 오류 메시지가 아닐 때만 history에 추가
-    const isError = aiText.includes('오류') || aiText.includes('초과') || aiText.includes('키가') || aiText.includes('인터넷') || aiText.includes('초과되었어요');
+    const aiText = await _fetchGroq(messages, 0);
+    // 오류가 아닐 때만 history에 추가
+    const isError = /오류|찼어요|키가|인터넷|시간이 초과/.test(aiText);
     if (!isError) {
-      chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
+      chatHistory.push({ role: 'assistant', content: aiText });
     }
     return aiText;
   } catch (e) {
-    if (e.name === 'AbortError') return '20초 초과되었어요. 다시 말씀해 주세요.';
-    return '인터넷 연결을 확인해 주세요.';
+    return '다시 시도해 주세요.';
   }
 }
 
@@ -1142,8 +1134,8 @@ async function handleConfirmSave(confirmed) {
 
     // 알람 대화 시작
     chatHistory.push({
-      role: 'model',
-      parts: [{ text: `저장이 완료되었습니다. 알람이 필요하시면 30분 전, 1시간 전, 하루 전 등으로 말씀해 주세요.` }]
+      role: 'assistant',
+      content: '저장이 완료되었습니다. 알람이 필요하시면 30분 전, 1시간 전, 하루 전 등으로 말씀해 주세요.'
     });
     if (chatHistory.length > 6) chatHistory = chatHistory.slice(-6);
     window._lastSavedId = saved.id;
