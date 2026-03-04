@@ -655,6 +655,7 @@ let currentTab = 'all';
 let isSpeaking = false;
 let speechSynth = window.speechSynthesis;
 let currentAudio = null;
+let isFetching = false;  // 중복 요청 방지
 // 음성 인식
 let recognition = null;
 let isListening = false;
@@ -741,10 +742,10 @@ function initSpeechRecognition() {
       input.value = final || interim;
       autoResize(input);
     }
-    // 최종 결과면 자동 전송
+    // 최종 결과면 자동 전송 (요청 중이 아닐 때만)
     if (final) {
       recognition.stop();
-      setTimeout(() => sendMessagePatched(), 300);
+      if (!isFetching) setTimeout(() => sendMessagePatched(), 300);
     }
   };
 
@@ -934,8 +935,8 @@ async function _fetchGemini(apiKey, requestBody, retryCount) {
       if (res.status === 400) return 'API 키가 잘못되었어요.';
       if (res.status === 403) return 'API 키가 차단되었어요. AI Studio에서 새 키를 발급하세요.';
       if (res.status === 429) {
-        if (retryCount >= 2) return '잠시 후 다시 말씀해 주세요. (사용량 초과)';
-        await new Promise(r => setTimeout(r, 4000));
+        if (retryCount >= 1) return '잠긄 사용량이 찼어요. 1분 후 다시 말씀해 주세요.';
+        await new Promise(r => setTimeout(r, 5000));
         return _fetchGemini(apiKey, requestBody, retryCount + 1);
       }
       const errText = await res.text().catch(() => '');
@@ -1031,19 +1032,16 @@ function autoResize(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
+// 수정: startConversation은 Gemini 호출 없이 로컬 인사말 표시 (API 절약)
 async function startConversation() {
   showTyping(true);
-  try {
-    const greeting = await callGemini('__start__');
-    showTyping(false);
-    addMessage(greeting, 'ai');
-  } catch(e) {
-    showTyping(false);
-    addMessage('다시 시도해 주세요.', 'ai');
-  }
+  await new Promise(r => setTimeout(r, 400)); // 자연스러운 딜레이
+  showTyping(false);
+  addMessage('무엇을 기억해둘까요?', 'ai');
 }
 
 async function sendMessage() {
+  if (isFetching) return;  // 중복 요청 차단
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
   if (!text) return;
@@ -1069,16 +1067,19 @@ async function sendMessage() {
   }
 
   showTyping(true);
+  isFetching = true;
   let aiReply;
   try {
     aiReply = await callGemini(text);
   } catch(e) {
     showTyping(false);
+    isFetching = false;
     addMessage('다시 시도해 주세요.', 'ai');
     document.getElementById('sendBtn').disabled = false;
     return;
   }
   showTyping(false);
+  isFetching = false;
 
   // SAVE_MEMORY 파싱
   const saveMatch = aiReply.match(/\[SAVE_MEMORY\]([\s\S]*?)\[\/SAVE_MEMORY\]/);
