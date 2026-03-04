@@ -1198,6 +1198,11 @@ function scheduleAlarm(memId, minutesBefore) {
   mem.alarmTime = alarmTime.toISOString();
   saveMemories();
 
+  // 브라우저 알림 권한 요청
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+
   if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
   alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), delay);
 }
@@ -1219,11 +1224,24 @@ function triggerAlarm(memId) {
   const mem = memories.find(m => m.id === memId);
   if (!mem) return;
   currentAlarmId = memId;
+
+  // 1) 브라우저 알림 (백그라운드에서도 동작)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try {
+      new Notification('알람 - 기억 도우미', {
+        body: mem.summary,
+        requireInteraction: true,
+        silent: false
+      });
+    } catch(e) {}
+  }
+
+  // 2) 알람 화면 표시 (포그라운드일 때)
   document.getElementById('alarmSummary').textContent = mem.summary;
   document.getElementById('alarmTime').textContent = mem.date ? `${formatDateKor(mem.date)} ${mem.time ? formatTime(mem.time) : ''}` : '';
   showScreen('alarm');
   playAlarmChime();
-  setTimeout(() => speakText(`알림입니다. ${mem.summary}`), 600);
+  setTimeout(() => speakText('알람입니다. ' + mem.summary), 600);
 }
 
 function dismissAlarm() {
@@ -1232,51 +1250,47 @@ function dismissAlarm() {
 }
 
 let chimeInterval = null;
-let _alarmAudios = [];
 
 function playAlarmChime() {
   stopAlarmChime();
-  // 모바일에서 가장 안정적인 방법: 진동 + Web Audio API 병행 사용
-  // 1) 진동 시도
-  if (navigator.vibrate) {
-    navigator.vibrate([500, 300, 500, 300, 500]);
-  }
-  // 2) 전역 AudioContext 사용 (첫 터치에 unlock됨)
+
+  // 진동
+  if (navigator.vibrate) navigator.vibrate([600, 300, 600, 300, 600, 300, 600]);
+
+  // TTS (가장 확실한 소리 알림)
+  speakText('알람입니다. 알람입니다.');
+
+  // Web Audio 비프음 (AudioContext unlock된 경우)
   function doBeep() {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) { speakText('알람입니다'); return; }
     const ctx = window._globalAudioCtx;
-    if (!ctx) {
-      // unlock이 안 되어 있는 경우 구어 스피치로 대체
-      speakText('알람입니다');
-      return;
-    }
+    if (!ctx) return;
     ctx.resume().then(() => {
       try {
         const o = ctx.createOscillator();
         const g = ctx.createGain();
         o.connect(g); g.connect(ctx.destination);
-        o.type = 'triangle';
-        o.frequency.setValueAtTime(880, ctx.currentTime);
-        o.frequency.setValueAtTime(1100, ctx.currentTime + 0.15);
-        o.frequency.setValueAtTime(880, ctx.currentTime + 0.3);
-        g.gain.setValueAtTime(0.6, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.9);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(1000, ctx.currentTime);
+        o.frequency.setValueAtTime(800, ctx.currentTime + 0.2);
+        g.gain.setValueAtTime(0.8, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
         o.start(ctx.currentTime);
-        o.stop(ctx.currentTime + 0.9);
+        o.stop(ctx.currentTime + 0.8);
       } catch(e) {}
     });
   }
+
   doBeep();
   chimeInterval = setInterval(() => {
     doBeep();
-    if (navigator.vibrate) navigator.vibrate([400, 200]);
-  }, 2500);
+    if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+  }, 3500);
 }
 
 function stopAlarmChime() {
   if (chimeInterval) { clearInterval(chimeInterval); chimeInterval = null; }
   if (navigator.vibrate) navigator.vibrate(0);
+  stopSpeaking();
 }
 
 /* ══════════════════════════════════
@@ -1548,6 +1562,31 @@ document.addEventListener('touchstart', () => {
     }
   }
 }, { once: false });
+
+// 백그라운드 복굼 시 알람 재확인 (setTimeout이 베이지 중 늘려져도 보상)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkOverdueAlarms();
+  }
+});
+
+// 1분마다 알람 시간 체크 (뼱힌 setTimeout 보완)
+setInterval(checkOverdueAlarms, 60000);
+
+function checkOverdueAlarms() {
+  const now = new Date();
+  memories.forEach(m => {
+    if (m.alarm && m.alarmTime && !alarmTimers[m.id + '_done']) {
+      const alarmDt = new Date(m.alarmTime);
+      // 이미 지나갔지만 5분 이내인 경우 지연 발사
+      const diff = now - alarmDt;
+      if (diff >= 0 && diff < 5 * 60 * 1000) {
+        alarmTimers[m.id + '_done'] = true;
+        triggerAlarm(m.id);
+      }
+    }
+  });
+}
 </script>
 </body>
 </html>
