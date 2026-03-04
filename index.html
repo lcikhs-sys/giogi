@@ -925,16 +925,15 @@ async function callGemini(userMessage) {
     contents: chatHistory,
     generationConfig: {
       temperature: 0.7,
-      maxOutputTokens: 1024,
-      responseMimeType: 'text/plain'
+      maxOutputTokens: 512
     }
   };
 
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -944,9 +943,8 @@ async function callGemini(userMessage) {
     );
     clearTimeout(timer);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      if (res.status === 400) return 'API 키가 잘못되었어요. 키를 다시 확인해 주세요.';
-      if (res.status === 403) return 'API 키가 차단되었어요. 새 키를 발급해 주세요.';
+      if (res.status === 400) return 'API 키가 잘못되었어요.';
+      if (res.status === 403) return 'API 키가 차단되었어요. AI Studio에서 새 키를 발급하세요.';
       if (res.status === 429) {
         await new Promise(r => setTimeout(r, 3000));
         return callGemini(userMessage);
@@ -958,7 +956,7 @@ async function callGemini(userMessage) {
     chatHistory.push({ role: 'model', parts: [{ text: aiText }] });
     return aiText;
   } catch (e) {
-    if (e.name === 'AbortError') return '15초 안에 응답이 없어요. 다시 말씀해 주세요.';
+    if (e.name === 'AbortError') return '20초 초과되었어요. 다시 말씀해 주세요.';
     return '인터넷 연결을 확인해 주세요.';
   }
 }
