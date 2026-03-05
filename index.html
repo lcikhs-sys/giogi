@@ -243,6 +243,45 @@
   .btn-confirm-save { background: var(--gold); color: #fff; }
   .btn-cancel-save { background: rgba(255,255,255,0.25); color: #fff; }
 
+  /* 알람 선택 카드 */
+  .alarm-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    margin: 4px 0;
+    align-self: flex-start;
+    max-width: 95%;
+    box-shadow: var(--shadow);
+    border: 2px solid var(--p);
+  }
+  .alarm-card-title {
+    font-size: 16px; font-weight: 700; color: var(--p);
+    margin-bottom: 14px; text-align: center;
+  }
+  .alarm-card-time {
+    font-size: 13px; color: #666; text-align: center;
+    margin-bottom: 14px; background: #f5f0ff;
+    border-radius: 10px; padding: 8px 12px;
+  }
+  .alarm-btns-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 10px;
+  }
+  .alarm-btn {
+    background: var(--p); color: #fff;
+    border: none; border-radius: 14px;
+    padding: 16px 8px; font-size: 18px; font-weight: 700;
+    cursor: pointer; text-align: center; line-height: 1.3;
+  }
+  .alarm-btn:active { opacity: 0.8; }
+  .alarm-btn-no {
+    background: #eee; color: #666;
+    border: none; border-radius: 14px;
+    padding: 14px; font-size: 16px; font-weight: 600;
+    cursor: pointer; width: 100%; margin-top: 2px;
+  }
+  .alarm-btn-no:active { opacity: 0.8; }
+
   /* ─── 입력창 ─── */
   .chat-input-area {
     background: var(--white);
@@ -1128,17 +1167,8 @@ async function handleConfirmSave(confirmed) {
     const saved = saveMemoryFromData(pendingSaveData);
     pendingSaveData = null;
     updateTodayBadge();
-
-    addMessage('저장했어요. 알람을 설정할까요?', 'ai');
-    speakText('저장했어요. 알람을 설정할까요?');
-
-    // 알람 대화 시작
-    chatHistory.push({
-      role: 'assistant',
-      content: '저장이 완료되었습니다. 알람이 필요하시면 30분 전, 1시간 전, 하루 전 등으로 말씀해 주세요.'
-    });
-    if (chatHistory.length > 6) chatHistory = chatHistory.slice(-6);
-    window._lastSavedId = saved.id;
+    addMessage('저장했어요.', 'ai', true);
+    showAlarmCard(saved);
   } else {
     pendingSaveData = null;
     showTyping(true);
@@ -1146,6 +1176,107 @@ async function handleConfirmSave(confirmed) {
     showTyping(false);
     addMessage(reply, 'ai');
   }
+}
+
+function showAlarmCard(mem) {
+  const container = document.getElementById('chatMessages');
+  const typingEl = document.getElementById('typingIndicator');
+
+  if (!mem.date) {
+    addMessage('메모로 저장했어요.', 'ai');
+    speakText('저장했어요.');
+    return;
+  }
+
+  const dt = new Date(mem.date + 'T' + (mem.time || '09:00') + ':00');
+  const dtStr = mem.date.replace(/-/g,'/') + ' ' + (mem.time || '09:00');
+
+  const options = [
+    { label: '10분 전', mins: 10 },
+    { label: '30분 전', mins: 30 },
+    { label: '1시간 전', mins: 60 },
+    { label: '2시간 전', mins: 120 },
+    { label: '3시간 전', mins: 180 },
+    { label: '하루 전', mins: 1440 },
+  ];
+
+  const btnHtml = options.map(o => {
+    const aDt = new Date(dt.getTime() - o.mins * 60000);
+    const h = String(aDt.getHours()).padStart(2,'0');
+    const m = String(aDt.getMinutes()).padStart(2,'0');
+    return '<button class="alarm-btn" onclick="doSetAlarm('' + mem.id + '',' + o.mins + ','' + escAttr(mem.summary) + '','' + mem.date + '','' + (mem.time||'09:00') + '')">' +
+           '<div>' + o.label + '</div><div style="font-size:13px;opacity:0.85">' + h + ':' + m + '</div></button>';
+  }).join('');
+
+  const card = document.createElement('div');
+  card.className = 'alarm-card';
+  card.id = 'alarmSelectCard';
+  card.innerHTML =
+    '<div class="alarm-card-title">알람 시간 선택</div>' +
+    '<div class="alarm-card-time">일정: ' + dtStr + ' · ' + escHtml(mem.summary) + '</div>' +
+    '<div class="alarm-btns-grid">' + btnHtml + '</div>' +
+    '<button class="alarm-btn-no" onclick="dismissAlarmCard()">알람 안 해도 돼요</button>';
+
+  container.insertBefore(card, typingEl);
+  container.scrollTop = container.scrollHeight;
+  speakText('알람 시간을 선택해 주세요.');
+}
+
+function escAttr(s) {
+  return String(s||'').replace(/'/g,"\'").replace(/"/g,'&quot;');
+}
+
+function dismissAlarmCard() {
+  const card = document.getElementById('alarmSelectCard');
+  if (card) card.remove();
+  addMessage('알람 없이 저장했어요.', 'ai');
+  speakText('알람 없이 저장했어요.');
+}
+
+function doSetAlarm(memId, mins, summary, date, time) {
+  const card = document.getElementById('alarmSelectCard');
+  if (card) card.remove();
+
+  const dt = new Date(date + 'T' + time + ':00');
+  const alarmDt = new Date(dt.getTime() - mins * 60000);
+  const now = new Date();
+
+  if (alarmDt <= now) {
+    addMessage('이미 지난 시간이에요.', 'ai');
+    speakText('이미 지난 시간이에요.');
+    return;
+  }
+
+  const h = String(alarmDt.getHours()).padStart(2,'0');
+  const m = String(alarmDt.getMinutes()).padStart(2,'0');
+
+  // localStorage 저장
+  const mem = memories.find(x => x.id === memId);
+  if (mem) {
+    mem.alarm = mins;
+    mem.alarmTime = alarmDt.toISOString();
+    saveMemories();
+    if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
+    alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), alarmDt - now);
+  }
+
+  // Android: 기본 시계 앱에 알람 등록
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (!isIOS) {
+    const intentUrl =
+      'intent:#Intent;action=android.intent.action.SET_ALARM;' +
+      'i.android.intent.extra.alarm.HOUR=' + alarmDt.getHours() + ';' +
+      'i.android.intent.extra.alarm.MINUTES=' + alarmDt.getMinutes() + ';' +
+      'S.android.intent.extra.alarm.MESSAGE=' + encodeURIComponent(summary) + ';' +
+      'Z.android.intent.extra.alarm.SKIP_UI=false;end';
+    setTimeout(() => { window.location.href = intentUrl; }, 200);
+  }
+
+  const msg = isIOS
+    ? (h + ':' + m + '에 알람을 직접 설정해 주세요.')
+    : ('갤럭시 시계 앱이 열립니다. ' + h + ':' + m + ' 알람을 확인해 주세요.');
+  addMessage(msg, 'ai');
+  speakText(msg);
 }
 
 function saveMemoryFromData(data) {
