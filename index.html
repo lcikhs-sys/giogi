@@ -1180,7 +1180,7 @@ async function handleConfirmSave(confirmed) {
 
 function showAlarmCard(mem) {
   const container = document.getElementById('chatMessages');
-  const typingEl = document.getElementById('typingIndicator');
+  const typingEl  = document.getElementById('typingIndicator');
 
   if (!mem.date) {
     addMessage('메모로 저장했어요.', 'ai');
@@ -1188,34 +1188,58 @@ function showAlarmCard(mem) {
     return;
   }
 
-  const dt = new Date(mem.date + 'T' + (mem.time || '09:00') + ':00');
+  const dt    = new Date(mem.date + 'T' + (mem.time || '09:00') + ':00');
   const dtStr = mem.date.replace(/-/g,'/') + ' ' + (mem.time || '09:00');
 
   const options = [
-    { label: '10분 전', mins: 10 },
-    { label: '30분 전', mins: 30 },
-    { label: '1시간 전', mins: 60 },
-    { label: '2시간 전', mins: 120 },
-    { label: '3시간 전', mins: 180 },
-    { label: '하루 전', mins: 1440 },
+    {label:'10분 전',  mins:10},
+    {label:'30분 전',  mins:30},
+    {label:'1시간 전', mins:60},
+    {label:'2시간 전', mins:120},
+    {label:'3시간 전', mins:180},
+    {label:'하루 전',  mins:1440},
   ];
-
-  const btnHtml = options.map(o => {
-    const aDt = new Date(dt.getTime() - o.mins * 60000);
-    const h = String(aDt.getHours()).padStart(2,'0');
-    const m = String(aDt.getMinutes()).padStart(2,'0');
-    return '<button class="alarm-btn" onclick="doSetAlarm('' + mem.id + '',' + o.mins + ','' + escAttr(mem.summary) + '','' + mem.date + '','' + (mem.time||'09:00') + '')">' +
-           '<div>' + o.label + '</div><div style="font-size:13px;opacity:0.85">' + h + ':' + m + '</div></button>';
-  }).join('');
 
   const card = document.createElement('div');
   card.className = 'alarm-card';
   card.id = 'alarmSelectCard';
-  card.innerHTML =
-    '<div class="alarm-card-title">알람 시간 선택</div>' +
-    '<div class="alarm-card-time">일정: ' + dtStr + ' · ' + escHtml(mem.summary) + '</div>' +
-    '<div class="alarm-btns-grid">' + btnHtml + '</div>' +
-    '<button class="alarm-btn-no" onclick="dismissAlarmCard()">알람 안 해도 돼요</button>';
+
+  // 제목
+  const title = document.createElement('div');
+  title.className = 'alarm-card-title';
+  title.textContent = '알람 시간 선택';
+  card.appendChild(title);
+
+  // 일정 시간 표시
+  const info = document.createElement('div');
+  info.className = 'alarm-card-time';
+  info.textContent = '일정: ' + dtStr + ' · ' + mem.summary;
+  card.appendChild(info);
+
+  // 버튼 그리드
+  const grid = document.createElement('div');
+  grid.className = 'alarm-btns-grid';
+
+  options.forEach(function(o) {
+    const aDt = new Date(dt.getTime() - o.mins * 60000);
+    const h   = String(aDt.getHours()).padStart(2,'0');
+    const m   = String(aDt.getMinutes()).padStart(2,'0');
+    const btn = document.createElement('button');
+    btn.className = 'alarm-btn';
+    btn.innerHTML = '<div>' + o.label + '</div><div style="font-size:13px;opacity:0.85">' + h + ':' + m + '</div>';
+    btn.addEventListener('click', function() {
+      doSetAlarm(mem.id, o.mins, mem.summary, mem.date, mem.time || '09:00');
+    });
+    grid.appendChild(btn);
+  });
+  card.appendChild(grid);
+
+  // 안 함 버튼
+  const noBtn = document.createElement('button');
+  noBtn.className = 'alarm-btn-no';
+  noBtn.textContent = '알람 안 해도 돼요';
+  noBtn.addEventListener('click', dismissAlarmCard);
+  card.appendChild(noBtn);
 
   container.insertBefore(card, typingEl);
   container.scrollTop = container.scrollHeight;
@@ -1237,9 +1261,9 @@ function doSetAlarm(memId, mins, summary, date, time) {
   const card = document.getElementById('alarmSelectCard');
   if (card) card.remove();
 
-  const dt = new Date(date + 'T' + time + ':00');
+  const dt      = new Date(date + 'T' + time + ':00');
   const alarmDt = new Date(dt.getTime() - mins * 60000);
-  const now = new Date();
+  const now     = new Date();
 
   if (alarmDt <= now) {
     addMessage('이미 지난 시간이에요.', 'ai');
@@ -1250,33 +1274,49 @@ function doSetAlarm(memId, mins, summary, date, time) {
   const h = String(alarmDt.getHours()).padStart(2,'0');
   const m = String(alarmDt.getMinutes()).padStart(2,'0');
 
-  // localStorage 저장
+  // localStorage 백업 저장 (앱 켜져 있을 때 폴백)
   const mem = memories.find(x => x.id === memId);
   if (mem) {
-    mem.alarm = mins;
+    mem.alarm    = mins;
     mem.alarmTime = alarmDt.toISOString();
     saveMemories();
     if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
     alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), alarmDt - now);
   }
 
-  // Android: 기본 시계 앱에 알람 등록
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  if (!isIOS) {
-    const intentUrl =
-      'intent:#Intent;action=android.intent.action.SET_ALARM;' +
-      'i.android.intent.extra.alarm.HOUR=' + alarmDt.getHours() + ';' +
-      'i.android.intent.extra.alarm.MINUTES=' + alarmDt.getMinutes() + ';' +
-      'S.android.intent.extra.alarm.MESSAGE=' + encodeURIComponent(summary) + ';' +
-      'Z.android.intent.extra.alarm.SKIP_UI=false;end';
-    setTimeout(() => { window.location.href = intentUrl; }, 200);
+
+  if (isIOS) {
+    addMessage(h + ':' + m + '에 기본 시계 앱에서 직접 설정해 주세요.', 'ai');
+    speakText(h + ':' + m + '에 알람을 설정해 주세요.');
+    return;
   }
 
-  const msg = isIOS
-    ? (h + ':' + m + '에 알람을 직접 설정해 주세요.')
-    : ('갤럭시 시계 앱이 열립니다. ' + h + ':' + m + ' 알람을 확인해 주세요.');
-  addMessage(msg, 'ai');
-  speakText(msg);
+  // Android: 링크 클릭 방식 (window.location보다 Chrome 차단 적음)
+  const intentUrl =
+    'intent:#Intent;action=android.intent.action.SET_ALARM;' +
+    'i.android.intent.extra.alarm.HOUR=' + alarmDt.getHours() + ';' +
+    'i.android.intent.extra.alarm.MINUTES=' + alarmDt.getMinutes() + ';' +
+    'S.android.intent.extra.alarm.MESSAGE=' + encodeURIComponent(summary) + ';' +
+    'Z.android.intent.extra.alarm.SKIP_UI=false;end';
+
+  // 채팅에 클릭 가능한 링크 버튼으로 표시
+  const container = document.getElementById('chatMessages');
+  const typingEl  = document.getElementById('typingIndicator');
+  const wrapper   = document.createElement('div');
+  wrapper.style.cssText = 'margin:6px 0;';
+  wrapper.innerHTML =
+    '<div style="font-size:15px;color:#555;margin-bottom:8px">' +
+      h + ':' + m + ' 알람 — 아래 버튼을 눌러 시계 앱을 여세요</div>' +
+    '<a href="' + intentUrl + '" ' +
+       'style="display:block;background:#7B4FEB;color:#fff;text-align:center;' +
+       'padding:18px;border-radius:16px;font-size:20px;font-weight:700;' +
+       'text-decoration:none;">' +
+      '⏰ 갤럭시 시계 앱 열기' +
+    '</a>';
+  container.insertBefore(wrapper, typingEl);
+  container.scrollTop = container.scrollHeight;
+  speakText('버튼을 눌러 시계 앱을 열어주세요.');
 }
 
 function saveMemoryFromData(data) {
