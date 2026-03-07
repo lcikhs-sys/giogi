@@ -1274,49 +1274,63 @@ function doSetAlarm(memId, mins, summary, date, time) {
   const h = String(alarmDt.getHours()).padStart(2,'0');
   const m = String(alarmDt.getMinutes()).padStart(2,'0');
 
-  // localStorage 백업 저장 (앱 켜져 있을 때 폴백)
+  // 앱 내부 알람도 같이 저장 (앱이 열려 있을 때 추가 보험)
   const mem = memories.find(x => x.id === memId);
   if (mem) {
-    mem.alarm    = mins;
+    mem.alarm     = mins;
     mem.alarmTime = alarmDt.toISOString();
     saveMemories();
     if (alarmTimers[memId]) clearTimeout(alarmTimers[memId]);
     alarmTimers[memId] = setTimeout(() => triggerAlarm(memId), alarmDt - now);
   }
 
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // 구글 캘린더 URL 생성 (intent:// 대신 HTTPS → Chrome 차단 없음)
+  function pad(n){ return String(n).padStart(2,'0'); }
+  const y  = alarmDt.getFullYear();
+  const mo = pad(alarmDt.getMonth()+1);
+  const d  = pad(alarmDt.getDate());
+  const hh = pad(alarmDt.getHours());
+  const mm = pad(alarmDt.getMinutes());
+  // 캘린더 이벤트 시작=알람시각, 종료=알람시각+1분
+  const endDt   = new Date(alarmDt.getTime() + 60000);
+  const ey = endDt.getFullYear();
+  const emo= pad(endDt.getMonth()+1);
+  const ed = pad(endDt.getDate());
+  const ehh= pad(endDt.getHours());
+  const emm= pad(endDt.getMinutes());
 
-  if (isIOS) {
-    addMessage(h + ':' + m + '에 기본 시계 앱에서 직접 설정해 주세요.', 'ai');
-    speakText(h + ':' + m + '에 알람을 설정해 주세요.');
-    return;
-  }
+  const calStart = y+mo+d+'T'+hh+mm+'00';
+  const calEnd   = ey+emo+ed+'T'+ehh+emm+'00';
+  const calTitle = encodeURIComponent('🔔 ' + summary);
+  const calDetail= encodeURIComponent('기억 도우미 알람\n일정: ' + date + ' ' + time);
+  const calUrl   = 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+                   '&text='    + calTitle +
+                   '&dates='   + calStart + '/' + calEnd +
+                   '&details=' + calDetail;
 
-  // Android: 링크 클릭 방식 (window.location보다 Chrome 차단 적음)
-  const intentUrl =
-    'intent:#Intent;action=android.intent.action.SET_ALARM;' +
-    'i.android.intent.extra.alarm.HOUR=' + alarmDt.getHours() + ';' +
-    'i.android.intent.extra.alarm.MINUTES=' + alarmDt.getMinutes() + ';' +
-    'S.android.intent.extra.alarm.MESSAGE=' + encodeURIComponent(summary) + ';' +
-    'Z.android.intent.extra.alarm.SKIP_UI=false;end';
-
-  // 채팅에 클릭 가능한 링크 버튼으로 표시
   const container = document.getElementById('chatMessages');
   const typingEl  = document.getElementById('typingIndicator');
   const wrapper   = document.createElement('div');
-  wrapper.style.cssText = 'margin:6px 0;';
+  wrapper.style.cssText = 'margin:8px 0;';
+
   wrapper.innerHTML =
-    '<div style="font-size:15px;color:#555;margin-bottom:8px">' +
-      h + ':' + m + ' 알람 — 아래 버튼을 눌러 시계 앱을 여세요</div>' +
-    '<a href="' + intentUrl + '" ' +
-       'style="display:block;background:#7B4FEB;color:#fff;text-align:center;' +
-       'padding:18px;border-radius:16px;font-size:20px;font-weight:700;' +
-       'text-decoration:none;">' +
-      '⏰ 갤럭시 시계 앱 열기' +
-    '</a>';
+    '<div style="background:#f0ebff;border-radius:16px;padding:16px 14px;">' +
+      '<div style="font-size:16px;font-weight:700;color:#4a2d8c;margin-bottom:6px">⏰ 알람 시각: ' + h + ':' + m + '</div>' +
+      '<div style="font-size:14px;color:#555;margin-bottom:12px">아래 버튼을 눌러 캘린더에 등록하면<br>핸드폰이 알람을 울려줘요!</div>' +
+      '<a href="' + calUrl + '" target="_blank" ' +
+         'style="display:block;background:#4285F4;color:#fff;text-align:center;' +
+         'padding:16px;border-radius:14px;font-size:19px;font-weight:700;' +
+         'text-decoration:none;letter-spacing:-0.3px;">' +
+        '📅 구글 캘린더에 알람 등록' +
+      '</a>' +
+      '<div style="font-size:13px;color:#888;margin-top:10px;text-align:center">' +
+        '열리면 오른쪽 위 저장 버튼만 누르면 돼요' +
+      '</div>' +
+    '</div>';
+
   container.insertBefore(wrapper, typingEl);
   container.scrollTop = container.scrollHeight;
-  speakText('버튼을 눌러 시계 앱을 열어주세요.');
+  speakText(h + '시 ' + m + '분에 알람을 등록할게요. 파란 버튼을 눌러 저장해 주세요.');
 }
 
 function saveMemoryFromData(data) {
